@@ -1,0 +1,66 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Fiona Yeung"
+output: html_document
+---
+
+```{r,echo=FALSE}
+library(caret)
+library(randomForest)
+
+training = read.csv("C:\\classes\\Coursera\\Data_Science_Specialization\\Practical_Machine_Learning\\project\\pml-training.csv")
+testing = read.csv("C:\\classes\\Coursera\\Data_Science_Specialization\\Practical_Machine_Learning\\project\\pml-testing.csv")
+
+# load my saved workspace (I don't want to run it again and again when I am just knitting the HTML file -- it takes a long time to run!)
+load("C:\\classes\\Coursera\\Data_Science_Specialization\\Practical_Machine_Learning\\project\\all_user_models.RData")
+
+set.seed(32323)
+
+```
+
+## Project objective
+In light of the recent advances and interests in wearable devices, this project focuses on using data collected from accelerometers on the belt, forearm, arm, and dumbbell of 6 test subjects to predict the manner in which they perform a set of exercise. The participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways (class labels A, B, C, D, and E). The goal of this project is to build a classifier to predict the class of performance label by using the dataset provided. According to the data originator, one of the ultimate goals of this project is to help assess how well the exercise is performed by providing an objective and reproducible measure. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+## Preprocessing
+The training dataset has 19622 observations with 160 attributes. First, I cleaned the dataset by discarding the attributes that do not contribute to the qualitative measures, such as raw timestamps and total number of belts worn for the data recording. Then I performed additional pruning of the attributes by removing those with zero or near zero covariates. A logical array was used to keep track of the attributes removed prior to training so that the exact procedure can be performed on the testing data. The remaining attributes are shown below:
+
+```{r}
+names(training_subset)
+```
+
+## Training
+After this step of data cleansing, only 49 attributes remain. I then proceeded with building a model using Random Forest for each of the participant because a few of the measurements in the training set appear to have large variance across different performers. It seems to make sense to have a personalized calibration procedure for each individual for this type of application because we most likely have physical characteristics, for example, motion range, that do not transfer from person to person. Based on this reason, I chose to fit a separate model for each test subject, according to the attribute "user_name", which can be mapped to the test set as well since our goal is to predict the performance quality on the same set of test subjects. 
+
+Random Forest was chosen because of its historical good performance and it is readily available from the R caret package. I did not perform standization or scaling as part of the preprocessing since classification trees are not typically sensitive to attribute scales. The following function was used in training and a sample model fit is given below:
+
+modelFit = train(classe ~., data=user_training_data[,-1], method = "rf", prox = TRUE)
+
+```{r}
+modelFit
+```
+
+## Cross validation error
+The following functions were used to assess the variable importance and the cross validation error:
+
+var_importance = varImp(modelFit, useModel = TRUE)
+
+cv_result = rfcv(user_training_data[,-1], user_training_data$classe, cv.fold=10) # 10-fold cross validation
+
+Some sample cross validation error plots are provided below:
+```{r,echo=FALSE}
+for (ii in 2:length(unique_users)) {
+    with(cv_result[[ii]], plot(n.var, error.cv, log="x", type="o", lwd=2, main=unique_users[ii]))
+    print(paste(unique_users[ii]))
+    print(cv_result[[ii]]$error.cv)
+}
+```
+
+As shown above, the cross validation error for each test subject is very small (< 0.05%). Since the error caused by using different number of attributes does not change significantly, I decided to keep all of the remaining attributes. The cross validation error for each participant is plotted above. Based on the small cross validation error, I would expect the out of sample error to be quite small (<= 0.05%), if the participants maintain the performance consistency for all of the class labels throughout the data collection.
+
+## Conclusion
+Using the models created individually for each test participant, the classifiers are able to predict the performance classes correctly 100% for the test set of 20 cases with all 5 performance classes for the same test subjects.
+
+
+
+
